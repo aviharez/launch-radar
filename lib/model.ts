@@ -821,11 +821,8 @@ export function stepText(step: FarmStep): string {
   return s;
 }
 
-export function capitalFor(p: SnapshotProtocol): number {
-  if (p.tvl_usd >= 5_000_000_000) return 250;
-  if (p.tvl_usd >= 1_000_000_000) return 150;
-  if (p.tvl_usd >= 100_000_000) return 100;
-  return 50;
+export function capitalFor(_p: SnapshotProtocol): number {
+  return TICKET_USD;
 }
 
 export function holdDaysFor(age: number | null): number {
@@ -847,36 +844,36 @@ export function actionFor(p: SnapshotProtocol, capital: number, chain: string): 
   const c = (p.category ?? '').toLowerCase();
   const name = p.name;
   if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) {
-    return `Supply $${capital} USDC to ${name} on ${chain}, then borrow $${Math.round(capital / 3)} of the chain's major asset against it and keep the loan-to-value under 40%.`;
+    return `Supply $${capital.toLocaleString('en-US')} USDC to ${name} on ${chain}, then borrow $${Math.round(capital / 3).toLocaleString('en-US')} of the chain's major asset against it and keep the loan-to-value under 40%.`;
   }
   if (c.includes('dex') || c.includes('liquidity manager')) {
-    return `Add $${capital} of liquidity to ${name}'s deepest USDC pair on ${chain}, then stake the LP receipt if the app offers it.`;
+    return `Add $${capital.toLocaleString('en-US')} of liquidity to ${name}'s deepest USDC pair on ${chain}, then stake the LP receipt if the app offers it.`;
   }
   if (c.includes('leveraged farm') || c.includes('yield')) {
-    return `Deposit $${capital} USDC into ${name}'s top vault on ${chain}; read its fee and lock-up before you sign, then leave the shares in the vault.`;
+    return `Deposit $${capital.toLocaleString('en-US')} USDC into ${name}'s top vault on ${chain}; read its fee and lock-up before you sign, then leave the shares in the vault.`;
   }
   if (c.includes('bridge')) {
-    return `Bridge $${capital} USDC to ${chain} through ${name}, then use the bridged balance in its app at least once so the bridge counts a real user.`;
+    return `Bridge $${capital.toLocaleString('en-US')} USDC to ${chain} through ${name}, then use the bridged balance in its app at least once so the bridge counts a real user.`;
   }
   if (c.includes('staking') || c.includes('restak')) {
-    return `Stake $${capital} of ${chain}'s native asset through ${name} and keep the liquid receipt token in the same wallet.`;
+    return `Stake $${capital.toLocaleString('en-US')} of ${chain}'s native asset through ${name} and keep the liquid receipt token in the same wallet.`;
   }
   if (c.includes('rwa') || c.includes('tokenized')) {
-    return `Finish ${name}'s KYC first, then mint or subscribe $${capital} of its yield asset on ${chain} and hold the receipt.`;
+    return `Finish ${name}'s KYC first, then mint or subscribe $${capital.toLocaleString('en-US')} of its yield asset on ${chain} and hold the receipt.`;
   }
   if (c.includes('perpetual') || c.includes('derivative') || c.includes('option') || c.includes('basis')) {
-    return `Deposit $${capital} USDC as margin on ${name} on ${chain} and open one small delta-neutral position.`;
+    return `Deposit $${capital.toLocaleString('en-US')} USDC as margin on ${name} on ${chain} and open one small delta-neutral position.`;
   }
   if (c.includes('prediction')) {
-    return `Fund $${capital} on ${name} on ${chain} and place one position in a market that resolves within 30 days.`;
+    return `Fund $${capital.toLocaleString('en-US')} on ${name} on ${chain} and place one position in a market that resolves within 30 days.`;
   }
   if (c.includes('insurance')) {
-    return `Buy $${capital} of cover from ${name} on ${chain} and keep the policy receipt in the farming wallet.`;
+    return `Buy $${capital.toLocaleString('en-US')} of cover from ${name} on ${chain} and keep the policy receipt in the farming wallet.`;
   }
   if (c.includes('curator') || c.includes('allocator') || c.includes('fund')) {
-    return `Deposit $${capital} USDC into a ${name} vault on ${chain}, note its curator, fee and redemption window, then leave it open.`;
+    return `Deposit $${capital.toLocaleString('en-US')} USDC into a ${name} vault on ${chain}, note its curator, fee and redemption window, then leave it open.`;
   }
-  return `Deposit $${capital} USDC into ${name} on ${chain} and keep the position open through the snapshot window.`;
+  return `Deposit $${capital.toLocaleString('en-US')} USDC into ${name} on ${chain} and keep the position open through the snapshot window.`;
 }
 
 /** The six actions, plus the seventh: a verdict with its own arithmetic. */
@@ -887,9 +884,9 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, verdict?: Far
   const gas = gasFor(p);
   const steps: FarmStep[] = [
     { text: `Create a fresh ${chain} wallet that holds only the funds you plan to farm, and keep its seed phrase offline.`, cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-    { text: actionFor(p, capital, chain), cost: `$${capital} of capital and about $${gas} of gas`, time: '20 minutes to set up' },
+    { text: actionFor(p, capital, chain), cost: `$${capital.toLocaleString('en-US')} of capital and about $${gas} of gas`, time: '20 minutes to set up' },
     { text: `Make one qualifying action each week from that wallet: a deposit, a borrow, a swap or a vote in ${p.name}'s governance.`, cost: 'about $2-5 of gas a week', time: '10 minutes a week' },
-    { text: `Keep the position open for at least ${hold} days so two snapshot dates see it, and do not move the wallet's funds in between.`, cost: `the $${capital} stays deployed`, time: `${hold} days` },
+    { text: `Keep the position open for at least ${hold} days so two snapshot dates see it, and do not move the wallet's funds in between.`, cost: `the $${capital.toLocaleString('en-US')} stays deployed`, time: `${hold} days` },
     { text: `Before you withdraw, check ${p.name}'s own site and X for a points or claim page; never pay a fee or sign a blind permit to claim.`, cost: 'no fee to check, and never a fee to claim', time: '10 minutes' },
     { text: `Write the wallet address, every date, the gas and each transaction hash in a farm log so you can repeat the position or unwind it.`, cost: 'nothing but the log', time: '5 minutes' },
   ];
@@ -922,6 +919,10 @@ export interface BoardRow {
   launch_value_usd: number;
   odds: number;
   implied_value_usd: number;
+  expected_value_usd: number;
+  slice_1k_usd: number;
+  fees_usd: number;
+  setup_minutes: number;
   range: { low_usd: number; high_usd: number };
   verdict: FarmVerdict;
   model: {
@@ -953,6 +954,10 @@ export interface RadarRow {
   launch_value_usd: number;
   odds: number;
   implied_value_usd: number;
+  expected_value_usd: number;
+  slice_1k_usd: number;
+  fees_usd: number;
+  setup_minutes: number;
   range_low_usd: number;
   range_high_usd: number;
   size_multiple: number;
@@ -1000,23 +1005,28 @@ function valueRow(p: SnapshotProtocol, snapshot: Snapshot, beta: number[], sigma
   const launchLow = Math.max(1, Math.round(launch * Math.exp(-Z80 * sigma)));
   const launchHigh = Math.min(1e11, Math.round(launch * Math.exp(Z80 * sigma)));
   const chance = oddsFor(p, snapshot.as_of, odds);
-  const implied = Math.max(1, Math.round(launch * chance));
-  const low = Math.max(1, Math.round(launchLow * chance));
-  const high = Math.min(1e11, Math.round(launchHigh * chance));
+  const expected = Math.max(1, Math.round(launch * chance));
   const hold = holdDaysFor(age);
   const gas = gasFor(p);
+  const weeks = Math.max(1, Math.ceil(hold / 7));
+  const hours = 0.25 + 0.15 * weeks + 0.2;
+  const slice = Math.round(expected * Math.min(1, TICKET_USD / Math.max(1, p.tvl_usd)) * DROP_SHARE * 100) / 100;
   return {
     age,
     launch,
     chance,
-    implied,
-    low,
-    high,
+    implied: launch,
+    expected,
+    low: launchLow,
+    high: launchHigh,
     launchLow,
     launchHigh,
     hold,
     gas,
-    verdict: farmVerdict(p.tvl_usd, implied, hold, gas),
+    slice,
+    fees: Math.round((gas + 3 * weeks) * 100) / 100,
+    setupMinutes: Math.round(hours * 60),
+    verdict: farmVerdict(p.tvl_usd, expected, hold, gas),
     sizeMultiple: Math.round((sizeBase / p.tvl_usd) * 1e4) / 1e4,
     ageMultiplier: Math.round(ageMultiplier * 1e4) / 1e4,
     growthMultiplier: Math.round(growthMultiplier * 1e4) / 1e4,
@@ -1061,7 +1071,7 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
   for (const p of early) chosen.set(p.slug, p);
 
   const scored = [...chosen.values()].map((p) => ({ p, v: valueRow(p, snapshot, beta, sigma, adjustment, summary.odds) }));
-  scored.sort((a, b) => b.v.implied - a.v.implied || b.p.tvl_usd - a.p.tvl_usd || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
+  scored.sort((a, b) => b.v.launch - a.v.launch || b.p.tvl_usd - a.p.tvl_usd || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
 
   const board: BoardRow[] = scored.map(({ p, v }, i) => ({
     rank: i + 1,
@@ -1081,6 +1091,10 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     launch_value_usd: v.launch,
     odds: Math.round(v.chance * 1e4) / 1e4,
     implied_value_usd: v.implied,
+    expected_value_usd: v.expected,
+    slice_1k_usd: v.slice,
+    fees_usd: v.fees,
+    setup_minutes: v.setupMinutes,
     range: { low_usd: v.low, high_usd: v.high },
     verdict: v.verdict,
     model: {
@@ -1147,6 +1161,10 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
         launch_value_usd: r.launch_value_usd,
         odds: r.odds,
         implied_value_usd: r.implied_value_usd,
+        expected_value_usd: r.expected_value_usd,
+        slice_1k_usd: r.slice_1k_usd,
+        fees_usd: r.fees_usd,
+        setup_minutes: r.setup_minutes,
         range_low_usd: r.range.low_usd,
         range_high_usd: r.range.high_usd,
         size_multiple: r.model.size_multiple,
@@ -1252,9 +1270,9 @@ export function dataScript(radar: RadarData): string {
   const rows = radar.rows.map((r) => [
     r.rank, r.slug, r.name, catId(r.category), chainIds(r.chains), r.tvl_usd,
     r.change_7d === null ? null : round3(r.change_7d), r.age_days, r.watchlist ? 1 : 0,
-    r.launch_value_usd, Math.round(r.odds * 1e4), r.implied_value_usd, r.range_low_usd, r.range_high_usd,
-    r.size_multiple, r.age_multiplier, r.growth_multiplier, r.category_multiplier, r.budget_usd, r.hold_days, r.gas_usd,
-    verdictCode(r.verdict), r.net_hour_usd, r.cost_usd, r.drop_usd, r.break_even_value_usd,
+    r.implied_value_usd, Math.round(r.odds * 1e4), r.range_low_usd, r.range_high_usd, r.expected_value_usd,
+    r.slice_1k_usd, r.fees_usd, r.setup_minutes, r.size_multiple, r.age_multiplier, r.growth_multiplier, r.category_multiplier,
+    r.budget_usd, r.hold_days, r.gas_usd, verdictCode(r.verdict), r.net_hour_usd, r.cost_usd, r.drop_usd, r.break_even_value_usd,
   ]);
   const meta = {
     as_of: radar.meta.as_of,

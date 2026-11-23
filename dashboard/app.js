@@ -43,14 +43,15 @@
   function pctRank(n) { return Math.round(n * 1000) / 10 + '%'; }
   function ticketLabel(n) { return '$' + n.toLocaleString('en-US'); }
 
-  // rows: [rank, slug, name, cat, chains, tvl, growth, ageDays, watch, launch, oddsInt, implied, low,
-  //        high, sizeMul, ageMul, growthMul, catMul, budget, hold, gas, verdictCode, netHour, cost, drop, breakEven]
+  // rows: [rank, slug, name, cat, chains, tvl, growth, ageDays, watch, implied, oddsInt, low, high,
+  //        expected, slice1k, fees, setupMin, sizeMul, ageMul, growthMul, catMul, budget, hold, gas,
+  //        verdictCode, netHour, cost, drop, breakEven]
   var rows = D.rows.map(function (r) {
     return {
       rank: r[0], slug: r[1], name: r[2], category: catName(r[3]), chains: chainText(r[4]), chainsShort: chainShort(r[4]),
-      tvl: r[5], growth: r[6], age: r[7], watch: r[8] === 1, launch: r[9], odds: r[10] / 10000, implied: r[11],
-      low: r[12], high: r[13], sizeMul: r[14], ageMul: r[15], growthMul: r[16], catMul: r[17],
-      budget: r[18], hold: r[19], gas: r[20]
+      tvl: r[5], growth: r[6], age: r[7], watch: r[8] === 1, implied: r[9], odds: r[10] / 10000,
+      low: r[11], high: r[12], expected: r[13], slice1k: r[14], fees: r[15], setupMin: r[16],
+      sizeMul: r[17], ageMul: r[18], growthMul: r[19], catMul: r[20], budget: r[21], hold: r[22], gas: r[23]
     };
   });
 
@@ -59,7 +60,7 @@
     var hours = 0.25 + 0.15 * weeks + 0.2;
     var cost = row.gas + 3 * weeks + ticket * CAPITAL_CHARGE * (row.hold / 365) + hours * HOUR_RATE;
     var share = Math.min(1, ticket / Math.max(1, row.tvl));
-    var drop = row.implied * share * DROP_SHARE;
+    var drop = row.expected * share * DROP_SHARE;
     var net = drop - cost;
     var perHour = net / hours;
     return {
@@ -75,16 +76,16 @@
     $('top-date').textContent = 'snapshot ' + M.as_of;
     $('lede').innerHTML =
       'A size and category comps curve prices each pre-token protocol <b>if its token launches</b>; a peer-odds model fitted on <b>' + O.n +
-      ' eligible protocols</b> supplies the chance it ever records one. Their product is the implied value, ranked below, with two blind tests and a costed farm verdict.';
+      ' eligible protocols</b> supplies the chance it ever records one. The board ranks by implied value; every row carries its expected value, a $1,000 slice and a costed farm verdict.';
     $('formula').innerHTML =
-      'implied value <span class="op">=</span> TVL <span class="op">×</span> fitted multiple <span class="op">·</span> (age, momentum, category, capped) <span class="op">×</span> token odds <span class="op">·</span> (size, age, chains, category) ' +
-      '— every coefficient fitted on this snapshot and tested held-out. No protocol is named in the code.';
-    $('eq').innerHTML = 'launch value <span class="op">=</span> <b>' + F.intercept.toFixed(2) + '</b> <span class="op">+</span> <b>' + F.slope.toFixed(3) + '</b> ln(TVL)<br>' +
+      'implied value <span class="op">=</span> TVL <span class="op">×</span> fitted multiple <span class="op">·</span> (age, momentum, category, capped) — what the token is worth if it launches. ' +
+      'expected value <span class="op">=</span> implied <span class="op">×</span> token odds <span class="op">·</span> (size, age, chains, category); slice <span class="op">=</span> expected <span class="op">×</span> your share of TVL <span class="op">×</span> 10%. Every coefficient is fitted on this snapshot and tested held-out. No protocol is named in the code.';
+    $('eq').innerHTML = 'implied value <span class="op">=</span> <b>' + F.intercept.toFixed(2) + '</b> <span class="op">+</span> <b>' + F.slope.toFixed(3) + '</b> ln(TVL)<br>' +
       '<span class="op">×</span> age <span class="op">×</span> 7d <span class="op">×</span> category, capped<br>' +
       'odds <span class="op">=</span> logit(size, age, chains, category)';
     var worth = rows.filter(function (r) { return verdictOf(r, state.ticket).label === 'worth'; }).length;
     $('factors').innerHTML =
-      '<li><span>Comps fit</span><b>' + F.n_live + ' live tokens</b></li>' +
+      '<li><span>Implied-value fit</span><b>' + F.n_live + ' live tokens</b></li>' +
       '<li><span>Token-odds fit</span><b>' + O.n + ' eligible peers</b></li>' +
       '<li><span>Value terms kept</span><b>size; age/momentum capped</b></li>' +
       '<li><span>Farm verdicts</span><b>' + worth + ' worth at ' + ticketLabel(state.ticket) + '</b></li>';
@@ -174,6 +175,7 @@
       if (key === 'nph') { va = verdictOf(a, state.ticket).netHour; vb = verdictOf(b, state.ticket).netHour; }
       else if (key === 'growth') { va = a.growth === null ? -1e9 : a.growth; vb = b.growth === null ? -1e9 : b.growth; }
       else if (key === 'age') { va = a.age === null ? 1e9 : a.age; vb = b.age === null ? 1e9 : b.age; }
+      else if (key === 'slice') { va = a.slice1k; vb = b.slice1k; }
       else { va = a[key]; vb = b[key]; }
       if (key === 'name') return dir * String(va).localeCompare(String(vb));
       return dir * ((va > vb) - (va < vb));
@@ -195,15 +197,17 @@
         '<td class="growth ' + gcls + '">' + g + '</td>' +
         '<td class="age">' + ageText(r.age) + '</td>' +
         '<td class="odds">' + Math.round(r.odds * 100) + '%</td>' +
-        '<td class="launch">' + usd(r.launch) + '</td>' +
         '<td class="value"><b>' + usd(r.implied) + '</b><small>' + usd(r.low) + ' – ' + usd(r.high) + '</small></td>' +
+        '<td class="slice">$' + r.slice1k.toFixed(2) + '</td>' +
+        '<td class="fees">$' + r.fees + '<br>' + r.setupMin + 'm</td>' +
         '<td class="verdict"><span class="badge ' + v.label + '">' + v.label + '</span><small>' + (v.netHour > 0 ? '+' : '') + '$' + v.netHour.toFixed(0) + '/h</small></td>' +
         '<td class="chev">›</td></tr>';
     }).join('');
     $('count').innerHTML = '<b>' + list.length + '</b> of ' + rows.length + ' rows';
     document.title = 'Launch Radar — ' + list.length + ' pre-token protocols ranked by expected value';
-    $('board-foot').innerHTML = 'Ranked by implied value = launch value × token odds, the model’s claim, not a promise. ' +
-      '<b>◆</b> marks the snapshot’s 40-protocol watchlist; the rest are early rows below the floor. The verdict uses a ' + ticketLabel(state.ticket) + ' ticket and the cost arithmetic shown in each row’s detail.';
+    $('board-foot').innerHTML = 'Ranked by implied value — what the token is worth if it launches — with the 10–90% band beneath. The expected value multiplies by token odds. ' +
+      'The slice is what $1,000 would hold if depositors get 10% of the expected value pro rata to TVL; fees are gas and weekly actions, setup is the plan’s time. ' +
+      'The verdict uses a ' + ticketLabel(state.ticket) + ' ticket and charges gas, fees, a 2%/yr capital charge and time. <b>◆</b> marks the watchlist; the rest are early rows below the floor.';
     document.querySelectorAll('#table thead th[data-key]').forEach(function (th) {
       var on = th.getAttribute('data-key') === state.sort;
       th.setAttribute('aria-sort', on ? (state.dir > 0 ? 'ascending' : 'descending') : 'none');
@@ -217,36 +221,37 @@
   function planFor(row) {
     var chain = row.chains.split(', ')[0] || 'its main chain';
     var capital = row.budget, hold = row.hold, gas = row.gas, name = row.name;
+    var cap = capital.toLocaleString('en-US');
     var c = row.category.toLowerCase();
     var action;
     if (c.indexOf('lend') >= 0 || c.indexOf('cdp') >= 0 || c.indexOf('collateral') >= 0) {
-      action = 'Supply $' + capital + ' USDC to ' + name + ' on ' + chain + ', then borrow $' + Math.round(capital / 3) + " of the chain's major asset against it and keep the loan-to-value under 40%.";
+      action = 'Supply $' + cap + ' USDC to ' + name + ' on ' + chain + ', then borrow $' + Math.round(capital / 3).toLocaleString('en-US') + " of the chain's major asset against it and keep the loan-to-value under 40%.";
     } else if (c.indexOf('dex') >= 0 || c.indexOf('liquidity manager') >= 0) {
-      action = "Add $" + capital + " of liquidity to " + name + "'s deepest USDC pair on " + chain + ', then stake the LP receipt if the app offers it.';
+      action = "Add $" + cap + " of liquidity to " + name + "'s deepest USDC pair on " + chain + ', then stake the LP receipt if the app offers it.';
     } else if (c.indexOf('leveraged farm') >= 0 || c.indexOf('yield') >= 0) {
-      action = 'Deposit $' + capital + ' USDC into ' + name + "'s top vault on " + chain + '; read its fee and lock-up before you sign, then leave the shares in the vault.';
+      action = 'Deposit $' + cap + ' USDC into ' + name + "'s top vault on " + chain + '; read its fee and lock-up before you sign, then leave the shares in the vault.';
     } else if (c.indexOf('bridge') >= 0) {
-      action = 'Bridge $' + capital + ' USDC to ' + chain + ' through ' + name + ', then use the bridged balance in its app at least once so the bridge counts a real user.';
+      action = 'Bridge $' + cap + ' USDC to ' + chain + ' through ' + name + ', then use the bridged balance in its app at least once so the bridge counts a real user.';
     } else if (c.indexOf('staking') >= 0 || c.indexOf('restak') >= 0) {
-      action = "Stake $" + capital + " of " + chain + "'s native asset through " + name + ' and keep the liquid receipt token in the same wallet.';
+      action = "Stake $" + cap + " of " + chain + "'s native asset through " + name + ' and keep the liquid receipt token in the same wallet.';
     } else if (c.indexOf('rwa') >= 0 || c.indexOf('tokenized') >= 0) {
-      action = 'Finish ' + name + "'s KYC first, then mint or subscribe $" + capital + ' of its yield asset on ' + chain + ' and hold the receipt.';
+      action = 'Finish ' + name + "'s KYC first, then mint or subscribe $" + cap + ' of its yield asset on ' + chain + ' and hold the receipt.';
     } else if (c.indexOf('perpetual') >= 0 || c.indexOf('derivative') >= 0 || c.indexOf('option') >= 0 || c.indexOf('basis') >= 0) {
-      action = 'Deposit $' + capital + ' USDC as margin on ' + name + ' on ' + chain + ' and open one small delta-neutral position.';
+      action = 'Deposit $' + cap + ' USDC as margin on ' + name + ' on ' + chain + ' and open one small delta-neutral position.';
     } else if (c.indexOf('prediction') >= 0) {
-      action = 'Fund $' + capital + ' on ' + name + ' on ' + chain + ' and place one position in a market that resolves within 30 days.';
+      action = 'Fund $' + cap + ' on ' + name + ' on ' + chain + ' and place one position in a market that resolves within 30 days.';
     } else if (c.indexOf('insurance') >= 0) {
-      action = 'Buy $' + capital + ' of cover from ' + name + ' on ' + chain + ' and keep the policy receipt in the farming wallet.';
+      action = 'Buy $' + cap + ' of cover from ' + name + ' on ' + chain + ' and keep the policy receipt in the farming wallet.';
     } else if (c.indexOf('curator') >= 0 || c.indexOf('allocator') >= 0 || c.indexOf('fund') >= 0) {
-      action = 'Deposit $' + capital + ' USDC into a ' + name + ' vault on ' + chain + ', note its curator, fee and redemption window, then leave it open.';
+      action = 'Deposit $' + cap + ' USDC into a ' + name + ' vault on ' + chain + ', note its curator, fee and redemption window, then leave it open.';
     } else {
-      action = 'Deposit $' + capital + ' USDC into ' + name + ' on ' + chain + ' and keep the position open through the snapshot window.';
+      action = 'Deposit $' + cap + ' USDC into ' + name + ' on ' + chain + ' and keep the position open through the snapshot window.';
     }
     return [
       { text: 'Create a fresh ' + chain + ' wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-      { text: action, cost: '$' + capital + ' of capital and about $' + gas + ' of gas', time: '20 minutes to set up' },
+      { text: action, cost: '$' + cap + ' of capital and about $' + gas + ' of gas', time: '20 minutes to set up' },
       { text: 'Make one qualifying action each week from that wallet: a deposit, a borrow, a swap or a vote in ' + name + "'s governance.", cost: 'about $2-5 of gas a week', time: '10 minutes a week' },
-      { text: 'Keep the position open for at least ' + hold + ' days so two snapshot dates see it, and do not move the wallet’s funds in between.', cost: 'the $' + capital + ' stays deployed', time: hold + ' days' },
+      { text: 'Keep the position open for at least ' + hold + ' days so two snapshot dates see it, and do not move the wallet’s funds in between.', cost: 'the $' + cap + ' stays deployed', time: hold + ' days' },
       { text: "Before you withdraw, check " + name + "'s own site and X for a points or claim page; never pay a fee or sign a blind permit to claim.", cost: 'no fee to check, and never a fee to claim', time: '10 minutes' },
       { text: 'Write the wallet address, every date, the gas and each transaction hash in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' }
     ];
@@ -257,8 +262,8 @@
     var v = verdictOf(row, state.ticket);
     var launch = Math.round(row.tvl * row.sizeMul * row.ageMul * row.growthMul * row.catMul);
     var ev = Math.round(launch * row.odds);
-    var launchDelta = Math.abs(launch - row.launch) / row.launch;
-    var evDelta = Math.abs(ev - row.implied) / row.implied;
+    var launchDelta = Math.abs(launch - row.implied) / row.implied;
+    var evDelta = Math.abs(ev - row.expected) / row.expected;
     var catN = 0;
     F.cats.forEach(function (c) { if (D.categories[c[0]] === row.category) catN = c[1]; });
     var factors = [
@@ -276,8 +281,8 @@
       '<h2>' + esc(row.name) + '</h2>' +
       '<p class="sub">' + esc(row.category) + ' · ' + esc(row.chainsShort) + (row.watch ? ' · ◆ watchlist' : ' · early radar') + '</p>' +
       '<p class="big-value">' + usd(row.implied) + '<small>implied value</small></p>' +
-      '<p class="band-line"><b>' + usd(row.launch) + '</b> if it launches × <b>' + Math.round(row.odds * 100) + '%</b> token odds · 10–90% band <b>' + usd(row.low) + ' – ' + usd(row.high) + '</b></p>' +
-      '<p class="check-line">Page arithmetic: ' + usd(row.tvl) + ' × ' + row.sizeMul.toFixed(3) + ' × ' + row.ageMul.toFixed(2) + ' × ' + row.growthMul.toFixed(2) + ' × ' + row.catMul.toFixed(2) + ' = <b>' + usd(launch) + '</b> if launched; × ' + Math.round(row.odds * 100) + '% = <b>' + usd(ev) + '</b>. ' + (launchDelta < 0.003 && evDelta < 0.01 ? 'Matches board.json (' + usdFull(row.implied) + ').' : 'board.json says ' + usdFull(row.implied) + '; the difference is the stored multipliers rounded.') + '</p>' +
+      '<p class="band-line"><b>' + usd(row.implied) + '</b> if it launches × <b>' + Math.round(row.odds * 100) + '%</b> odds = <b>' + usd(row.expected) + '</b> expected · 10–90% band <b>' + usd(row.low) + ' – ' + usd(row.high) + '</b></p>' +
+      '<p class="check-line">Page arithmetic: ' + usd(row.tvl) + ' × ' + row.sizeMul.toFixed(3) + ' × ' + row.ageMul.toFixed(2) + ' × ' + row.growthMul.toFixed(2) + ' × ' + row.catMul.toFixed(2) + ' = <b>' + usd(launch) + '</b> if launched; × ' + Math.round(row.odds * 100) + '% = <b>' + usd(ev) + '</b>. ' + (launchDelta < 0.003 && evDelta < 0.01 ? 'Matches board.json (' + usdFull(row.implied) + ' implied, ' + usdFull(row.expected) + ' expected).' : 'board.json says ' + usdFull(row.implied) + '; the difference is the stored multipliers rounded.') + '</p>' +
       '<div class="verdict-card"><div class="vc-top"><span class="badge ' + v.label + '">' + v.label + '</span><b>Farm verdict · ' + ticketLabel(state.ticket) + ' ticket</b><span>' + (v.netHour > 0 ? '+' : '') + '$' + v.netHour.toFixed(2) + '/h</span></div>' +
       '<p>$' + v.cost.toFixed(0) + ' all in over ' + row.hold + ' days (' + v.hours.toFixed(2) + ' h of work) against a <b>$' + v.drop.toFixed(0) + ' expected drop</b> (10% of the expected value for your share of TVL): net <b>$' + v.net.toFixed(0) + '</b>, ' + word + '. Breaks even if the expected value is worth <b>' + usd(v.breakEven) + '</b>.</p></div>' +
       '<p class="section-h">What made the number</p><div class="decomp">' +
@@ -285,7 +290,7 @@
         var cls = f[3] === 'odds' ? 'pos' : Math.abs(f[2] - 1) < 0.005 ? '' : f[2] > 1 ? 'pos' : 'neg';
         return '<div><span>' + esc(f[0]) + '<small>' + esc(f[1]) + '</small></span><b class="' + cls + '">' + (f[3] === 'odds' ? Math.round(f[2] * 100) + '%' : f[2].toFixed(3) + '×') + '</b></div>';
       }).join('') + '</div>' +
-      '<p class="section-h">Farm plan · $' + row.budget + ' budget · ' + row.hold + '-day hold</p><ol class="plan">' +
+      '<p class="section-h">Farm plan · $' + row.budget.toLocaleString('en-US') + ' budget · ' + row.hold + '-day hold</p><ol class="plan">' +
       steps.map(function (s) {
         return '<li><p>' + esc(s.text) + '</p><div class="chips"><span>' + esc(s.cost) + '</span><span>' + esc(s.time) + '</span></div></li>';
       }).join('') +
@@ -295,7 +300,7 @@
       '<div><span>TVL</span><b>' + usdFull(row.tvl) + '</b></div>' +
       '<div><span>7-day TVL change</span><b>' + pct(row.growth) + '</b></div>' +
       '<div><span>Tracked without a token</span><b>' + ageText(row.age) + '</b></div>' +
-      '<div><span>If it launches</span><b>' + usdFull(row.launch) + '</b></div>' +
+      '<div><span>Expected value</span><b>' + usdFull(row.expected) + '</b></div>' +
       '<div><span>Token odds</span><b>' + Math.round(row.odds * 100) + '%</b></div>' +
       '<div><span>Category comps</span><b>' + row.category + (catN ? ' · n=' + catN : '') + '</b></div></div>' +
       '<p class="disclaimer">The plan is generated from this protocol’s own category, chains, TVL and age, never from a hand-written list. The verdict assumes 10% of the expected value reaches depositors, pro rata to their share of TVL. Nothing here is investment advice.</p>' +
@@ -434,7 +439,7 @@
     if (p.get('verdict')) { state.verdict = p.get('verdict'); $('verdict').value = state.verdict; }
     if (p.get('ticket')) { state.ticket = Number(p.get('ticket')) || 10000; $('ticket').value = String(state.ticket); }
     if (p.get('watch') === '1') { state.watch = true; $('watch').checked = true; }
-    if (p.get('sort')) { var s = p.get('sort'); if (['rank', 'name', 'tvl', 'growth', 'age', 'odds', 'launch', 'implied', 'nph'].indexOf(s) >= 0) state.sort = s; }
+    if (p.get('sort')) { var s = p.get('sort'); if (['rank', 'name', 'tvl', 'growth', 'age', 'odds', 'implied', 'slice', 'fees', 'nph'].indexOf(s) >= 0) state.sort = s; }
     if (p.get('dir')) state.dir = p.get('dir') === 'asc' ? 1 : -1;
     renderRows();
     renderChrome();

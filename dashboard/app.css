@@ -197,12 +197,9 @@ td.growth.up { color: var(--mint); }
 td.growth.down { color: var(--red); }
 td.age { color: var(--muted); font: 11.5px/1 var(--mono); white-space: nowrap; }
 td.value { min-width: 150px; }
-.value-row { display: flex; align-items: center; gap: 12px; }
-.value-row b { font: 600 14px/1 var(--mono); color: var(--amber-2); white-space: nowrap; letter-spacing: -0.02em; }
-.bar { flex: 1; height: 5px; border-radius: 99px; background: #1b2331; overflow: hidden; }
-.bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(243, 183, 78, 0.35), var(--amber)); }
-td.launch { color: var(--ink); font: 11.5px/1 var(--mono); white-space: nowrap; }
 td.odds { font: 11.5px/1 var(--mono); white-space: nowrap; }
+td.slice { color: var(--mint); font: 11.5px/1 var(--mono); white-space: nowrap; }
+td.fees { color: var(--muted); font: 10px/1.35 var(--mono); white-space: nowrap; }
 td.value b { display: block; font: 600 13px/1 var(--mono); color: var(--amber-2); }
 td.value small { display: block; margin-top: 2px; color: var(--dim); font: 9px/1.2 var(--mono); }
 td.verdict { white-space: nowrap; }
