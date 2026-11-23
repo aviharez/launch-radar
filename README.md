@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/token-radar-01/aviharez/launch-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![reward](https://make.fun/badge/token-radar-01/aviharez/launch-radar/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
-A comps-fitted token launch radar: one frozen DefiLlama snapshot in, a ranked board of pre-token protocols out, each priced as if its token had launched, with the leave-one-out error the fit earned and a six-step farm plan generated from the protocol's own record.
+Launch Radar v3: a launch-value comps curve times a peer-odds model, both fitted on one frozen DefiLlama snapshot, with two blind tests, an honest P10–P90 band, costed farm verdicts in net dollars per hour, and a ledger of all 758 protocols. The page ranks 178 pre-token protocols by expected value.
 
 ## Run it
 
