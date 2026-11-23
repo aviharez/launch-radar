@@ -72,7 +72,27 @@
 
   // ------------------------------------------------------------------ chrome, tiles, ledger
 
+  function renderValueMap() {
+    var el = $('value-map');
+    if (!el) return;
+    var w = 330, h = 118, pad = 12, x0 = 6.5, x1 = 10.2, y0 = 5.0, y1 = 9.0;
+    var sx = function (v) { return pad + (v - x0) / (x1 - x0) * (w - pad - 8); };
+    var sy = function (v) { return h - pad - (v - y0) / (y1 - y0) * (h - pad - 10); };
+    var out = '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="TVL against implied value, log scales">';
+    out += '<line x1="' + pad + '" y1="' + (h - pad) + '" x2="' + (w - 8) + '" y2="' + (h - pad) + '" stroke="#2b3647"/>';
+    out += '<line x1="' + pad + '" y1="10" x2="' + pad + '" y2="' + (h - pad) + '" stroke="#2b3647"/>';
+    out += '<text x="' + (w - 8) + '" y="' + (h - 3) + '" text-anchor="end" fill="#6a7688" font-size="8.5">TVL, log</text>';
+    out += '<text x="' + (pad + 3) + '" y="12" fill="#6a7688" font-size="8.5">implied value</text>';
+    rows.forEach(function (r) {
+      var cx = sx(Math.log10(Math.max(1, r.tvl))), cy = sy(Math.log10(Math.max(1, r.implied)));
+      if (cx < pad || cx > w - 8 || cy < 10 || cy > h - pad) return;
+      out += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (r.watch ? 2.3 : 1.4) + '" fill="' + (r.watch ? '#f3b74e' : '#5a6b86') + '" fill-opacity="' + (r.watch ? 0.9 : 0.55) + '"/>';
+    });
+    el.innerHTML = out + '</svg>';
+  }
+
   function renderChrome() {
+    renderValueMap();
     $('top-date').textContent = 'snapshot ' + M.as_of;
     $('lede').innerHTML =
       'A size and category comps curve prices each pre-token protocol <b>if its token launches</b>; a peer-odds model fitted on <b>' + O.n +
@@ -83,21 +103,18 @@
     $('eq').innerHTML = 'implied value <span class="op">=</span> <b>' + F.intercept.toFixed(2) + '</b> <span class="op">+</span> <b>' + F.slope.toFixed(3) + '</b> ln(TVL)<br>' +
       '<span class="op">×</span> age <span class="op">×</span> 7d <span class="op">×</span> category, capped<br>' +
       'odds <span class="op">=</span> logit(size, age, chains, category)';
-    var worth = rows.filter(function (r) { return verdictOf(r, state.ticket).label === 'worth'; }).length;
-    $('factors').innerHTML =
-      '<li><span>Implied-value fit</span><b>' + F.n_live + ' live tokens</b></li>' +
-      '<li><span>Token-odds fit</span><b>' + O.n + ' eligible peers</b></li>' +
-      '<li><span>Value terms kept</span><b>size; age/momentum capped</b></li>' +
-      '<li><span>Farm verdicts</span><b>' + worth + ' worth at ' + ticketLabel(state.ticket) + '</b></li>';
-    $('card-foot').textContent = 'Value R² ' + F.r2.toFixed(2) + '; P10–P90 covers ' + pctRank(F.coverage) + ' of held-out caps. Odds CV Brier ' + O.cv_brier.toFixed(3) + ' vs ' + O.base_brier.toFixed(3) + ' base. The band is wide and honest; the odds are a peer base rate, not a promise.';
+    var worthRows = rows.map(function (r) { return { r: r, v: verdictOf(r, state.ticket) }; }).filter(function (x) { return x.v.label === 'worth'; });
+    var worth = worthRows.length;
+    var best = worthRows.reduce(function (m, x) { return Math.max(m, x.v.netHour); }, 0);
+    $('card-foot').textContent = 'Value R² ' + F.r2.toFixed(2) + ' · band ' + pctRank(F.coverage) + ' · odds Brier ' + O.cv_brier.toFixed(3) + ' vs ' + O.base_brier.toFixed(3) + ' base (AUC ' + O.cv_auc.toFixed(2) + ', ' + O.n + ' peers). The band is wide and honest; the odds are a peer base rate, not a promise.';
 
     var blind = F.blinds[0];
     var tiles = [
       ['amber', '×' + blind[6].toFixed(2), 'Out-of-sample miss, LOO', 'flat multiple ×' + blind[7].toFixed(2)],
       ['mint', pctRank(F.coverage), 'P10–P90 band coverage', 'ideal 80%; ' + F.n_live + ' held-out caps'],
-      ['', O.cv_brier.toFixed(3), 'Token-odds Brier, 5-fold', 'base ' + O.base_brier.toFixed(3) + ' · AUC ' + O.cv_auc.toFixed(2)],
-      ['', '2 of 3', 'Value terms kept', 'size kept; age and momentum capped'],
+      ['', usd(M.total_implied_usd), 'Total implied value', M.watchlist + ' watchlist + ' + M.early + ' early'],
       ['mint', worth + ' of ' + rows.length, 'Worth farming', ticketLabel(state.ticket) + ' ticket · $25/hour bar'],
+      ['', '+$' + Math.round(best) + '/h', 'Best farm rate', 'net of gas, fees, capital and time'],
       ['amber', M.watchlist + '/40', 'Watchlist ranked', M.watchlist + ' watchlist · ' + M.early + ' early']
     ];
     $('tiles').innerHTML = tiles.map(function (t) {
