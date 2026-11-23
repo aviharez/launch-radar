@@ -181,6 +181,7 @@
         '<td class="chev">›</td></tr>';
     }).join('');
     $('count').innerHTML = '<b>' + list.length + '</b> of ' + rows.length + ' rows';
+    document.title = 'Launch Radar — ' + list.length + ' pre-token protocols ranked by implied value';
     $('board-foot').innerHTML = 'Ranked by implied value, the model’s claim of what the token would be worth if the protocol’s record stayed as it is. ' +
       '<b>◆</b> marks a protocol on the snapshot’s 40-protocol watchlist; the rest are early rows below the floor. Click a row for the terms and the farm plan.';
     document.querySelectorAll('#table thead th[data-key]').forEach(function (th) {

@@ -50,7 +50,11 @@ mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
 writeFileSync(join(out, 'data.js'), dataScript(radar));
 
-/** Copy one directory's regular files into `to`, skipping names that start with a dot. */
+/**
+ * Copy one directory's regular files into `to`, skipping names that start with a dot. The target is
+ * cleared first: a local rerun must leave exactly the files this run wrote, never a screenshot or a
+ * stylesheet from an earlier one, so the dossier the gate rebuilds is the dossier this run wrote.
+ */
 function copyFiles(from: string, to: string): string[] {
   if (!existsSync(from)) return [];
   rmSync(to, { recursive: true, force: true });
