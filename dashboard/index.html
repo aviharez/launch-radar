@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Radar — pre-token protocols ranked by implied value</title>
+<meta name="description" content="A comps-fitted model that prices every pre-token protocol in DefiLlama's snapshot as if its token launched, with the error bars the fit earned.">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-row">
+    <div class="brand"><span class="beacon" aria-hidden="true"></span>Launch Radar <span class="sep">/</span> <span class="dim">make.fun token-radar-01</span></div>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab" data-tab="board" aria-selected="true">Board</button>
+      <button class="tab" data-tab="method" aria-selected="false">Method</button>
+      <button class="tab" data-tab="live" aria-selected="false">Live tokens</button>
+    </nav>
+    <div class="top-meta"><span class="pulse" aria-hidden="true"></span><span id="top-date">snapshot</span> · DefiLlama</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" id="hero">
+    <div>
+      <p class="kicker">Pre-token valuation · fitted on the snapshot itself</p>
+      <h1>Every protocol still waiting on a token, <em>priced as if it launched.</em></h1>
+      <p class="lede" id="lede"></p>
+      <div class="hero-tags" id="hero-tags"></div>
+    </div>
+    <aside class="card" aria-label="Model card">
+      <div class="radar" aria-hidden="true">
+        <svg viewBox="0 0 200 200" role="presentation">
+          <g fill="none" stroke="#f3b74e" stroke-opacity="0.28">
+            <circle cx="100" cy="100" r="34"/><circle cx="100" cy="100" r="58"/><circle cx="100" cy="100" r="82"/>
+          </g>
+          <g stroke="#f3b74e" stroke-opacity="0.18">
+            <path d="M100 18v164M18 100h164M42 42l116 116M158 42L42 158"/>
+          </g>
+          <path d="M100 100 L166 44 A82 82 0 0 1 180 88 Z" fill="#f3b74e" fill-opacity="0.08"/>
+          <g fill="#f3b74e">
+            <circle cx="130" cy="72" r="3.2"/><circle cx="78" cy="66" r="2.6"/><circle cx="146" cy="118" r="2.4"/>
+            <circle cx="64" cy="124" r="3"/><circle cx="108" cy="52" r="2"/><circle cx="118" cy="142" r="2.6"/>
+            <circle cx="52" cy="92" r="2"/><circle cx="90" cy="110" r="2.2"/>
+          </g>
+          <circle cx="100" cy="100" r="3.4" fill="#5fd6a2"/>
+        </svg>
+      </div>
+      <p class="card-kicker">The model</p>
+      <p class="eq" id="eq"></p>
+      <ul class="factors" id="factors"></ul>
+      <p class="card-foot" id="card-foot"></p>
+    </aside>
+  </section>
+
+  <section class="stats" id="stats" aria-label="Headline figures"></section>
+
+  <section class="view" id="view-board">
+    <div class="toolbar">
+      <label class="field"><span>Search</span><input id="q" type="search" placeholder="name, category or chain" autocomplete="off"></label>
+      <label class="field"><span>Category</span><select id="category"></select></label>
+      <label class="field"><span>Chain</span><select id="chain"></select></label>
+      <label class="check"><input id="watch" type="checkbox"> Watchlist only</label>
+      <button class="ghost" id="reset">Reset</button>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="table">
+        <thead>
+          <tr>
+            <th class="num" data-key="rank" aria-sort="ascending"><button>Rank <span class="arrow">↑</span></button></th>
+            <th data-key="name"><button>Protocol <span class="arrow">↕</span></button></th>
+            <th class="num" data-key="tvl"><button>TVL <span class="arrow">↕</span></button></th>
+            <th class="num" data-key="growth"><button>7-day <span class="arrow">↕</span></button></th>
+            <th class="num age" data-key="age"><button>Tracked <span class="arrow">↕</span></button></th>
+            <th class="num" data-key="implied" aria-sort="descending"><button>Implied value <span class="arrow">↓</span></button></th>
+            <th class="num band">10–90% band</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="footnote" id="board-foot"></p>
+  </section>
+
+  <section class="view" id="view-method" hidden></section>
+  <section class="view" id="view-live" hidden></section>
+</main>
+
+<footer class="foot wrap">
+  <div><b>Launch Radar</b> · a comps curve fitted on DefiLlama's 2026-11-14 protocol snapshot, built by an AI agent for make.fun's token-radar-01 bounty.</div>
+  <div>Implied values are the model's claim, not a promise or advice. The watchlist is the floor, never the ceiling.</div>
+</footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Protocol detail"></aside>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
