@@ -37,7 +37,7 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-export const MODEL_VERSION = 'launch-radar/6';
+export const MODEL_VERSION = 'launch-radar/7';
 /** Every watchlist slug and the largest pre-token protocols below the floor. */
 export const BOARD_ROWS = 198;
 /** The house's flat multiple, the baseline every fitted curve has to beat. */
@@ -652,7 +652,7 @@ function valueRow(p: SnapshotProtocol, snapshot: Snapshot, fit: ValueFit, odds: 
   const launchHigh = Math.min(1e11, Math.round(launch * ratios[1]));
   const chance = Math.round(oddsFor(p, snapshot.as_of, odds) * 1e6) / 1e6;
   const expected = Math.max(1, Math.round(launch * chance));
-  const { steps, ...verdict } = farm.evaluate({ name: p.name, category: p.category, chains: p.chains, tvl: p.tvl_usd, expected });
+  const { steps, ...verdict } = farm.evaluate({ slug: p.slug, name: p.name, category: p.category, chains: p.chains, tvl: p.tvl_usd, expected });
   return {
     age,
     launch,

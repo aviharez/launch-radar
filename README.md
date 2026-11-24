@@ -10,6 +10,8 @@ The cap model uses a ridge-fitted TVL curve, listing age and seven-day TVL chang
 
 The peer token share is a cross-sectional statistic, not a launch probability. Farm routes show steps, selected-network costs, time and net outcomes under four allocation assumptions without implying eligibility. Research-only routes commit no principal. Export the current filter and sort as a CSV with the selected network and budget's modeled costs.
 
+Selected protocols have an additional read-only diligence check based on their public product documentation, including vault share locks, queued redemptions and slashing. Product docs never feed the valuation or establish an airdrop.
+
 ## Run it
 
 ```sh

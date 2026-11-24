@@ -11,6 +11,16 @@
   const money = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
   const gasPerTx = (chain) => ({ Ethereum: 6, Solana: 0.25, Bitcoin: 3, Tron: 3, Avalanche: 0.60, Base: 0.15, Arbitrum: 0.25, Optimism: 0.25, Polygon: 0.10 })[chain] ?? 2;
 
+  // Product research changes safety checks, never the valuation or eligibility.
+  const diligence = {
+    'steakhouse-financial': 'Steakhouse vault catalog: distinguish Prime Instant from High Yield Term before choosing an exit; legacy deployments are not the current product line. Source: steakhouse.financial/docs/products/vault-products/legacy-vaults.',
+    gauntlet: 'For a Morpho USDC Core route, match its curator and network in the listed market, then inspect exposure and available withdrawals. Source: docs.gauntlet.xyz/onboarding/quickstart.',
+    veda: 'Match the BoringVault and Teller for the intended product. Inspect share lock, instant exit buffer and whether a queue request would be needed. Source: docs.veda.tech/integrations/deposits-and-withdrawals-overview.',
+    upshift: 'Check whether the specific vault is atomic or epoch-based. In a queued vault, budget separately for the redemption request and the later claim. Source: docs.upshift.finance/contracts/vault-interface.',
+    symbiotic: 'Read the vault’s collateral, epoch and slashing rules. A withdrawal request is not a settled exit; do not stake based on implied cap. Source: docs.symbiotic.fi/learn/core-concepts/vault.',
+  };
+  const delayedExit = new Set(['veda', 'upshift']);
+
   // The sealed file carries no product, eligibility, fees or campaign data. A route is a
   // conditional workflow, not a claim that a certain market, asset or reward exists.
   function route(category) {
@@ -43,13 +53,15 @@
 
   /** @returns {FarmScenario} */
   function evaluate(row, ticket = DEFAULT_TICKET, dropShare = DROP_SHARE, network = '', includeSteps = true) {
-    const [name, first, review, exit, tx] = route(row.category ?? '');
+    const [name, first, review, exit, baseTx] = route(row.category ?? '');
+    const fieldNote = Object.hasOwn(diligence, row.slug) ? diligence[row.slug] : '';
+    const tx = baseTx ? baseTx + 1 + Number(delayedExit.has(row.slug)) : 0;
     const chain = row.chains.includes(network) ? network : row.chains[0] ?? 'unlisted network';
     const active = tx > 0 && row.chains.length > 0;
     const capital = active ? ticket : 0;
     const hold = active ? 28 : 0;
     const gas = active ? gasPerTx(chain) * tx : 0;
-    const feeRate = tx === 3 ? 0.003 : 0.001;
+    const feeRate = name === 'Liquidity' ? 0.003 : 0.001;
     const venue = capital * feeRate;
     const carry = capital * CAPITAL_RATE * hold / 365;
     const hours = active ? 78 / 60 : 25 / 60;
@@ -66,7 +78,7 @@
       noDrop: -cost, breakEven: drop > 0 ? dropShare * cost / drop : null,
       breakEvenCapital: breakEvenCapital !== null && breakEvenCapital <= row.tvl ? breakEvenCapital : null,
       steps: !includeSteps ? [] : [
-        ['Before funding', `Confirm ${row.name} lists the intended product on ${chain}; verify the official domain, contract and current jurisdiction rules. No confirmed incentive is in the sealed input.`, '$0', '10 min'],
+        ['Before funding', `Verify ${row.name}'s official product, contract and eligibility on ${chain}. ${fieldNote || 'No confirmed incentive is in the sealed input.'}`, '$0', '10 min'],
         [active ? 'Day 0 · quote first' : 'Before any deposit', first, active ? `${money(capital)} max principal · ${money(gas + venue)} round-trip allowance` : '$0 principal', active ? '20 min' : '10 min'],
         ...(active ? [[
           'Preflight · abort if unsafe',
