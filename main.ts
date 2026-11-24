@@ -2,10 +2,9 @@
 //
 // Node 22, standard library only. It reads the sealed snapshot from /input/snapshot.json (or
 // --input <file|dir>), fits the comps model in lib/model.ts over the snapshot's own live-token
-// protocols, scores every pre-token protocol on the board, writes /output/board.json and
-// /output/data.js, copies dashboard/ and screenshots/, and last writes /output/dossier.json with the
-// vendored make.fun library. Two runs on the same snapshot write the same bytes: no clock, no
-// randomness beyond a fixed seed, no network.
+// protocols, scores every pre-token protocol, writes /output/board.json, copies the
+// static dashboard and screenshots, then writes dashboard/radar-data.js and builds dossier.json
+// with the vendored make.fun library. Same snapshot in, same output bytes; no clock or network.
 //
 // Locally: mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
 
@@ -48,7 +47,6 @@ if (issue !== null) {
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
-writeFileSync(join(out, 'data.js'), dataScript(radar));
 
 /**
  * Copy one directory's regular files into `to`, skipping names that start with a dot. The target is
@@ -71,6 +69,7 @@ function copyFiles(from: string, to: string): string[] {
 }
 
 copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
+writeFileSync(join(out, 'dashboard', 'radar-data.js'), dataScript(radar));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
 if (shots.length < 3) {
   process.stderr.write(`launch radar: screenshots/ holds ${shots.length} image${shots.length === 1 ? '' : 's'}: hand in 3 or 4, the board, a detail view, the method and a filtered view\n`);
@@ -89,5 +88,5 @@ writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEX
 process.stdout.write(
   `launch radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.meta.early} early)\n` +
     `launch radar: fit ${summary.version} on ${summary.n_live} live tokens: slope ${summary.slope}, R2 ${summary.r2}, LOO MdAPE ${summary.loo_mdape}, rank ${summary.loo_rank} (flat 0.25x: ${summary.flat_mdape} / ${summary.flat_rank})\n` +
-    `launch radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')}, ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
+    `launch radar: wrote board.json, dashboard/ (${join(out, 'dashboard', 'radar-data.js')}), screenshots/ (${shots.length} images) and dossier.json under ${out}\n`,
 );

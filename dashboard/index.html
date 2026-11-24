@@ -3,89 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Launch Radar — pre-token protocols ranked by expected value</title>
-<meta name="description" content="A launch-value comps model times a peer-odds model, fitted on one frozen DefiLlama snapshot, with blind tests, a costed farm verdict and a ledger of all 758 protocols.">
+<title>Launch Radar · Before the ticker</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header class="top">
-  <div class="wrap top-row">
-    <div class="brand"><span class="beacon" aria-hidden="true"></span>Launch Radar <span class="sep">/</span> <span class="dim">make.fun token-radar-01</span></div>
-    <nav class="tabs" aria-label="Views">
-      <button class="tab" data-tab="board" aria-selected="true">Board</button>
-      <button class="tab" data-tab="method" aria-selected="false">Method</button>
-      <button class="tab" data-tab="live" aria-selected="false">Live tokens</button>
+<header class="masthead">
+  <div class="wrap top">
+    <div class="wordmark"><i aria-hidden="true">◉</i> Launch Radar</div>
+    <nav aria-label="Views">
+      <button data-tab="board" aria-pressed="true">Radar</button>
+      <button data-tab="method" aria-pressed="false">Model lab</button>
+      <button data-tab="peers" aria-pressed="false">Priced peers</button>
     </nav>
-    <div class="top-meta"><span class="pulse" aria-hidden="true"></span><span id="top-date">snapshot</span> · DefiLlama · model radar-3</div>
+    <div class="source-tag" id="source-tag"></div>
   </div>
 </header>
-
-<main class="wrap">
-  <section class="hero" id="hero">
-    <div class="hero-copy">
-      <p class="kicker">Pre-token valuation · value × odds · fitted on the snapshot itself</p>
-      <h1>What a token would be worth — <em>and whether it ever exists.</em></h1>
-      <p class="lede" id="lede"></p>
-      <p class="formula" id="formula"></p>
+<main>
+  <section class="intro" id="intro">
+    <div class="wrap intro-grid">
+      <div>
+        <p class="eyebrow">RESEARCH TERMINAL <span> / </span> TOKEN DISCOVERY</p>
+        <h1>Before the ticker.</h1>
+        <p class="lead">A valuation and diligence board for protocols with no recorded token. Rank by circulating value <strong>if a token launches</strong>; model participation costs separately.</p>
+        <p class="equation" id="equation"></p>
+      </div>
+      <div class="hero-chart" id="hero-chart"></div>
     </div>
-    <aside class="card" aria-label="Model card">
-      <div class="value-map" id="value-map" aria-hidden="true"></div>
-      <p class="card-kicker">The model</p>
-      <p class="eq" id="eq"></p>
-      <p class="card-foot" id="card-foot"></p>
-    </aside>
   </section>
-
-  <section class="tiles" id="tiles" aria-label="Headline figures"></section>
-  <section class="ledger" id="ledger" aria-label="Protocol accounting"></section>
-
-  <section class="view" id="view-board">
-    <div class="toolbar">
-      <label class="field"><span>Search</span><input id="q" type="search" placeholder="name, category or chain" autocomplete="off"></label>
-      <label class="field"><span>Verdict</span><select id="verdict"><option value="all">All verdicts</option><option value="worth">Worth farming</option><option value="marginal">Marginal</option><option value="skip">Skip</option></select></label>
-      <label class="field"><span>Category</span><select id="category"></select></label>
-      <label class="field"><span>Chain</span><select id="chain"></select></label>
-      <label class="field"><span>Ticket</span><select id="ticket"><option value="1000">$1,000</option><option value="10000" selected>$10,000</option><option value="25000">$25,000</option></select></label>
-      <label class="check"><input id="watch" type="checkbox"> Watchlist only</label>
-      <button class="ghost" id="reset">Reset</button>
-      <div class="count" id="count"></div>
-    </div>
-    <div class="table-wrap">
-      <table id="table">
-        <thead>
-          <tr>
-            <th class="num" data-key="rank" aria-sort="ascending"><button># <span class="arrow">↑</span></button></th>
-            <th data-key="name"><button>Protocol <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="tvl"><button>TVL <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="growth"><button>7-day <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="age"><button>Age <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="odds"><button>Odds <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="implied" aria-sort="descending"><button>Implied value <span class="arrow">↓</span></button></th>
-            <th class="num" data-key="slice"><button>Slice / $1k <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="fees"><button>Fees + setup <span class="arrow">↕</span></button></th>
-            <th class="num" data-key="nph"><button>Verdict <span class="arrow">↕</span></button></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
-    <p class="footnote" id="board-foot"></p>
-  </section>
-
-  <section class="view" id="view-method" hidden></section>
-  <section class="view" id="view-live" hidden></section>
+  <div class="wrap content" id="background">
+    <section id="board" aria-label="Ranked protocols">
+      <div class="signals" id="signals"></div>
+      <div class="section-top">
+        <div><p class="eyebrow">01 / PROTOCOL SCREEN</p><h2>Launch candidates</h2></div>
+        <p id="count" aria-live="polite"></p>
+      </div>
+      <div class="filters">
+        <label class="search">Search <input id="q" type="search" placeholder="Protocol, category or chain"></label>
+        <label>Coverage <select id="tier"><option value="">All ranked</option><option value="watch">Watchlist only</option><option value="early">Early only</option></select></label>
+        <label>Category <select id="category"></select></label>
+        <label>Chain <select id="chain"></select></label>
+        <label>Farm screen <select id="verdict"><option value="">All plans</option><option value="worth">Passes hurdle</option><option value="marginal">Covers costs</option><option value="skip">Below costs</option><option value="watch">Research only</option></select></label>
+        <label>Budget cap <select id="ticket"><option value="250">$250</option><option value="1000" selected>$1,000</option><option value="5000">$5,000</option><option value="10000">$10,000</option></select></label>
+        <button id="reset" class="outline">Reset</button>
+      </div>
+      <div class="sheet"><table id="board-table">
+        <thead><tr>
+          <th data-sort="rank"><button>Rank</button></th>
+          <th data-sort="name"><button>Protocol</button></th>
+          <th data-sort="tvl"><button>TVL</button></th>
+          <th data-sort="growth"><button>7d change</button></th>
+          <th data-sort="age"><button>Tracked</button></th>
+          <th data-sort="odds"><button>Peer share</button></th>
+          <th data-sort="implied" aria-sort="descending"><button>Implied cap</button></th>
+          <th data-sort="netHour"><button>Farm screen</button></th>
+        </tr></thead><tbody id="rows"></tbody>
+      </table></div>
+      <p class="note">Ranges use the 10th and 90th percentiles of comparable-token errors. Peer share reflects token records at the snapshot, not launch odds. Plans and cost scenarios do not verify eligibility or predict returns.</p>
+      <details><summary>Audit all snapshot classifications</summary><div id="ledger"></div></details>
+    </section>
+    <section id="method" hidden></section>
+    <section id="peers" hidden></section>
+  </div>
 </main>
-
-<footer class="foot wrap">
-  <div><b>Launch Radar</b> · a launch-value comps model times a peer-odds model, fitted on DefiLlama's 2026-11-14 protocol snapshot, built by an AI agent for make.fun's token-radar-01 bounty.</div>
-  <div>Implied value is the model's claim, not a promise or advice. The watchlist is the floor, never the ceiling.</div>
-</footer>
-
-<div class="scrim" id="scrim" hidden></div>
-<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Protocol detail"></aside>
-
-<script src="../data.js"></script>
+<footer class="wrap" id="source"></footer>
+<dialog id="detail" aria-labelledby="detail-name"><article id="detail-body"></article></dialog>
+<script src="farm.js"></script>
+<script src="radar-data.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
