@@ -3,7 +3,7 @@
  * route: string, chain: string, active: boolean, capital: number, hold: number,
  * gas: number, venue: number, carry: number, hours: number, cost: number, drop: number,
  * net: number, netHour: number, label: 'worth'|'marginal'|'skip'|'watch',
- * noDrop: number, breakEven: number|null, steps: [string,string,string,string][]
+ * noDrop: number, breakEven: number|null, breakEvenCapital: number|null, steps: [string,string,string,string][]
  * }} FarmScenario */
 (function (root) {
   'use strict';
@@ -42,28 +42,37 @@
   }
 
   /** @returns {FarmScenario} */
-  function evaluate(row, ticket = DEFAULT_TICKET, dropShare = DROP_SHARE) {
+  function evaluate(row, ticket = DEFAULT_TICKET, dropShare = DROP_SHARE, network = '', includeSteps = true) {
     const [name, first, review, exit, tx] = route(row.category ?? '');
-    const chain = row.chains[0] ?? 'unlisted network';
+    const chain = row.chains.includes(network) ? network : row.chains[0] ?? 'unlisted network';
     const active = tx > 0 && row.chains.length > 0;
     const capital = active ? ticket : 0;
     const hold = active ? 28 : 0;
     const gas = active ? gasPerTx(chain) * tx : 0;
-    const venue = active ? capital * (tx === 3 ? 0.003 : 0.001) : 0;
+    const feeRate = tx === 3 ? 0.003 : 0.001;
+    const venue = capital * feeRate;
     const carry = capital * CAPITAL_RATE * hold / 365;
-    const hours = active ? 70 / 60 : 25 / 60;
+    const hours = active ? 78 / 60 : 25 / 60;
     const cost = gas + venue + carry + hours * HOUR_RATE;
     const fraction = Math.min(1, capital / row.tvl);
     const drop = row.expected * fraction * dropShare;
     const net = drop - cost;
     const netHour = net / hours;
     const label = active ? (netHour >= HOUR_RATE ? 'worth' : net >= 0 ? 'marginal' : 'skip') : 'watch';
+    const contribution = row.expected * dropShare / row.tvl - feeRate - CAPITAL_RATE * hold / 365;
+    const breakEvenCapital = active && contribution > 0 ? Math.ceil((gas + hours * HOUR_RATE) / contribution) : null;
     return {
       route: name, chain, active, capital, hold, gas, venue, carry, hours, cost, drop, net, netHour, label,
       noDrop: -cost, breakEven: drop > 0 ? dropShare * cost / drop : null,
-      steps: [
+      breakEvenCapital: breakEvenCapital !== null && breakEvenCapital <= row.tvl ? breakEvenCapital : null,
+      steps: !includeSteps ? [] : [
         ['Before funding', `Confirm ${row.name} lists the intended product on ${chain}; verify the official domain, contract and current jurisdiction rules. No confirmed incentive is in the sealed input.`, '$0', '10 min'],
         [active ? 'Day 0 · quote first' : 'Before any deposit', first, active ? `${money(capital)} max principal · ${money(gas + venue)} round-trip allowance` : '$0 principal', active ? '20 min' : '10 min'],
+        ...(active ? [[
+          'Preflight · abort if unsafe',
+          'Simulate the exact approval and deposit; read minimum received, confirm the target address and confirm a permitted exit. Keep gas for the unwind. Do not sign if eligibility is unclear.',
+          '$0 simulation', '8 min',
+        ]] : []),
         [active ? 'Weekly ×4' : 'If terms change', review, '$0 planned on-chain spend', active ? '4 × 6 min' : 'Alert only'],
         [active ? 'Day 28 · exit' : 'After review', exit, active ? 'Exit included in round-trip allowance' : '$0', active ? '16 min' : '5 min'],
       ],

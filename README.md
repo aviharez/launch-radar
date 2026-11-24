@@ -6,9 +6,9 @@
 
 **Before the ticker** ranks protocols by implied circulating market cap conditional on a launch. It covers all 40 sealed watchlist members and 138 below-floor candidates. Priced tokens and records with a token marker but no cap are accounted for separately.
 
-The cap model uses TVL, listing age and seven-day TVL change. The Model lab shows leave-one-out and older-to-newer cohort ablations against a flat TVL multiple. Cohort dates are listing dates, not historical caps or launch dates. The browser checks the fitted normal equations, replays the valuation and range for every row, and verifies the board fingerprint.
+The cap model uses a ridge-fitted TVL curve, listing age and seven-day TVL change. The Model lab shows leave-one-out and older-to-newer cohort ablations against a flat TVL multiple. Cohort dates are listing dates, not historical caps or launch dates. The browser refits the model from the 90 priced observations and rederives the intervals from leave-one-out errors, then verifies the export fingerprint over ranks, caps and ranges.
 
-The peer token share is a cross-sectional statistic, not a launch probability. Farm routes use it only in a labeled cost scenario; they show steps, time, round-trip costs, and the zero-allocation outcome without implying eligibility. Research-only routes commit no principal.
+The peer token share is a cross-sectional statistic, not a launch probability. Farm routes show steps, selected-network costs, time and net outcomes under four allocation assumptions without implying eligibility. Research-only routes commit no principal. Export the current filter and sort as a CSV with the selected network and budget's modeled costs.
 
 ## Run it
 

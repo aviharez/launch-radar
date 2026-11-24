@@ -1,17 +1,8 @@
 // Launch Radar: a launch-value comps model and a peer-odds model, both fitted on one frozen snapshot.
 //
-// The snapshot is one read of DefiLlama's protocol index: 758 protocols, 144 of them with a token that
-// trades, and 40 on the watchlist (>= $50M TVL, no token recorded, not a wrapped or staked product of a
-// token that already trades). Two questions are answered from the snapshot's own record, never from a
-// hand-written list of names:
-//
-//   1. IF IT LAUNCHES, what is the token worth?
-//          ln(market cap) = a + b ln(TVL) + c ln(age in years) + d (7-day TVL change, %)
-//      fitted on the live tokens with a market cap, a tracking date and a market cap within 10x TVL
-//      (a token priced above that line is pricing something TVL does not describe and is left out of
-//      comp set). The size term is unpenalized, and age and growth have ridge penalties
-//      and caps so sparse evidence cannot dominate. Category pricing is tested separately:
-//      it is not deployed in the cap, but remains a feature of the token-prevalence model.
+// The sealed snapshot lists 758 protocols, including 40 watchlist slugs. A conditional
+// log-cap regression uses TVL, a bounded TVL curvature term, listing age, and 7-day
+// TVL change. The browser refits it from the same priced comparables as the entrypoint.
 //
 //   2. HOW COMMON IS A RECORDED TOKEN AMONG SIMILAR PROTOCOLS?
 //      Ridge logistic regression of observed token markers on size, listing age and chain count,
@@ -23,6 +14,7 @@
 
 import farm from '../dashboard/farm.js';
 import type { FarmScenario } from '../dashboard/farm.js';
+import pricing from '../dashboard/price.js';
 
 export interface SnapshotProtocol {
   slug: string;
@@ -45,16 +37,13 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-export const MODEL_VERSION = 'launch-radar/5';
+export const MODEL_VERSION = 'launch-radar/6';
 /** Every watchlist slug and the largest pre-token protocols below the floor. */
 export const BOARD_ROWS = 198;
 /** The house's flat multiple, the baseline every fitted curve has to beat. */
 export const FLAT_MULTIPLE = 0.25;
 /** A live token priced above this multiple of its TVL is not a comparable. */
 const OUTLIER_MULTIPLE = 10;
-/** The value model's second-order caps, in log space. */
-const AGE_CAP = 0.25;
-const GROWTH_CAP = 0.1;
 
 const DAY_MS = 86_400_000;
 
@@ -147,32 +136,8 @@ function solve(matrix: number[][], rhs: number[]): number[] {
   return a.map((row) => row[n]!);
 }
 
-function leastSquares(features: number[][], y: number[], penalties: number[]) {
-  const k = features.length + 1;
-  const xtx = Array.from({ length: k }, () => new Array<number>(k).fill(0));
-  const xty = new Array<number>(k).fill(0);
-  for (let i = 0; i < y.length; i++) {
-    const row = [1, ...features.map((f) => f[i]!)];
-    for (let a = 0; a < k; a++) {
-      xty[a] += row[a]! * y[i]!;
-      for (let b = 0; b < k; b++) xtx[a]![b] += row[a]! * row[b]!;
-    }
-  }
-  for (let j = 1; j < k; j++) xtx[j]![j] += penalties[j - 1]!;
-  return { fitted: solve(xtx, xty), xtx, xty };
-}
-
 function dot(beta: number[], x: number[]): number {
   return beta[0]! + x.reduce((s, v, i) => s + beta[i + 1]! * v, 0);
-}
-
-function cappedLog(beta: number[], x: number, z: number, growth: number): number {
-  return (
-    beta[0]! +
-    beta[1]! * x +
-    Math.max(-AGE_CAP, Math.min(AGE_CAP, beta[2]! * z)) +
-    Math.max(-GROWTH_CAP, Math.min(GROWTH_CAP, beta[3]! * growth))
-  );
 }
 
 function sigmoid(z: number): number {
@@ -232,13 +197,11 @@ interface Comp {
   slug: string;
   name: string;
   category: string | null;
-  chains: string[];
   tvl: number;
   mcap: number;
-  growth: number;
+  age: number;
+  growth: number | null;
   listed: string;
-  x: number;
-  z: number;
   y: number;
 }
 
@@ -249,10 +212,7 @@ interface CategoryAdjustment {
   shrunk: number;
 }
 
-interface ScatterPoint {
-  tvl: number;
-  actual: number;
-}
+type PricingObservation = [tvl: number, cap: number, age: number, change7d: number | null];
 
 interface LiveRow {
   name: string;
@@ -274,7 +234,7 @@ interface BlindTest {
   flat_miss: number;
 }
 
-type ValueFit = { beta: number[]; xtx: number[][]; xty: number[]; ratios: [number, number] };
+type ValueFit = { beta: number[]; ratios: [number, number] };
 type EvidenceRow = { label: string; loo: number; forward: number };
 
 interface OddsTerm {
@@ -332,10 +292,8 @@ export interface FitSummary {
   loo_rank: number;
   flat_mdape: number;
   flat_rank: number;
-  age_cap: number;
-  growth_cap: number;
   coverage: number;
-  scatter: ScatterPoint[];
+  observations: PricingObservation[];
   live: LiveRow[];
   odds: OddsModel;
   blinds: BlindTest[];
@@ -349,19 +307,17 @@ function comps(snapshot: Snapshot): Comp[] {
   for (const p of snapshot.protocols) {
     if (p.mcap_usd === null || p.mcap_usd <= 0 || p.tvl_usd <= 0) continue;
     if (p.mcap_usd > OUTLIER_MULTIPLE * p.tvl_usd) continue;
-    const years = ageYears(snapshot.as_of, p.listed_at);
-    if (years === null || p.listed_at === null) continue;
+    const age = ageDays(snapshot.as_of, p.listed_at);
+    if (age === null || p.listed_at === null) continue;
     rows.push({
       slug: p.slug,
       name: p.name,
       category: p.category,
-      chains: p.chains,
       tvl: p.tvl_usd,
       mcap: p.mcap_usd,
-      growth: p.change_7d ?? 0,
+      age,
+      growth: p.change_7d,
       listed: p.listed_at,
-      x: Math.log(p.tvl_usd),
-      z: Math.log(years),
       y: Math.log(p.mcap_usd),
     });
   }
@@ -385,18 +341,14 @@ function scorePredictions(actual: number[], predicted: number[], flat: number[])
 }
 
 /** Fit the very same pricing function used on the board, with an explicit ablation mask. */
-function fitValue(rows: Comp[], useAge = true, useGrowth = true, useCategory = false) {
-  const features = [rows.map((r) => r.x)];
-  const penalties = [0];
-  if (useAge) { features.push(rows.map((r) => r.z)); penalties.push(4); }
-  if (useGrowth) { features.push(rows.map((r) => r.growth)); penalties.push(40); }
-  const { fitted, xtx, xty } = leastSquares(features, rows.map((r) => r.y), penalties);
-  const beta = [fitted[0]!, fitted[1]!, useAge ? fitted[2]! : 0, useGrowth ? fitted[useAge ? 3 : 2]! : 0];
+function fitValue(rows: Comp[], useAge = true, useGrowth = true, useCategory = false, useCurve = true) {
+  const beta = pricing.fit(rows.map((r) => [r.tvl, r.mcap, r.age, r.growth]), useAge, useGrowth, useCurve);
+  const capLog = (r: Comp) => Math.log(pricing.factors(beta, r.tvl, r.age, r.growth).raw);
   const groups = new Map<string, number[]>();
   if (useCategory) for (const r of rows) {
     const key = r.category ?? 'Other';
     const residuals = groups.get(key) ?? [];
-    residuals.push(r.y - cappedLog(beta, r.x, r.z, r.growth));
+    residuals.push(r.y - capLog(r));
     groups.set(key, residuals);
   }
   const categories: CategoryAdjustment[] = [...groups]
@@ -408,8 +360,8 @@ function fitValue(rows: Comp[], useAge = true, useGrowth = true, useCategory = f
     })
     .sort((a, b) => b.n - a.n || a.category.localeCompare(b.category));
   const adjustment = new Map(categories.map((c) => [c.category, c.shrunk]));
-  const predict = (r: Comp) => cappedLog(beta, r.x, r.z, r.growth) + (adjustment.get(r.category ?? 'Other') ?? 0);
-  return { beta, xtx, xty, predict };
+  const predict = (r: Comp) => capLog(r) + (adjustment.get(r.category ?? 'Other') ?? 0);
+  return { beta, predict };
 }
 
 /** Empirical error quantiles from predictions made without the target row. */
@@ -545,7 +497,7 @@ function fitRadar(snapshot: Snapshot): Omit<FitSummary, 'ledger'> {
   const rows = comps(snapshot);
   if (rows.length < 12) throw new SnapshotError(`only ${rows.length} live-token protocols with a tracking date: too few to fit a comps curve`);
   const y = rows.map((r) => r.y);
-  const { beta, xtx, xty, predict } = fitValue(rows);
+  const { beta, predict } = fitValue(rows);
   const residuals = rows.map((r) => r.y - predict(r));
   const meanY = y.reduce((s, v) => s + v, 0) / y.length;
   const ssTot = y.reduce((s, v) => s + (v - meanY) ** 2, 0);
@@ -561,14 +513,14 @@ function fitRadar(snapshot: Snapshot): Omit<FitSummary, 'ledger'> {
   const newer = order.filter((r) => r.listed >= boundary);
   const folds = rows.map((_, hold) => rows.filter((_, i) => i !== hold));
   const stage = [
-    { label: 'Deployed · TVL, age, 7-day change', age: true, growth: true, category: false },
-    { label: 'TVL only', age: false, growth: false, category: false },
-    { label: 'Without listing age', age: false, growth: true, category: false },
-    { label: 'Without 7-day change', age: true, growth: false, category: false },
-    { label: 'With category residual', age: true, growth: true, category: true },
-  ].map(({ label, age, growth, category }) => {
-    const loo = folds.map((train, i) => fitValue(train, age, growth, category).predict(rows[i]!));
-    const forward = newer.map(fitValue(older, age, growth, category).predict);
+    { label: 'Deployed · TVL curve, age, 7-day change' },
+    { label: 'Without TVL curvature', curve: false },
+    { label: 'Without listing age', age: false },
+    { label: 'Without 7-day change', growth: false },
+    { label: 'With category residual', category: true },
+  ].map(({ label, age, growth, category, curve }) => {
+    const loo = folds.map((train, i) => fitValue(train, age, growth, category, curve).predict(rows[i]!));
+    const forward = newer.map(fitValue(older, age, growth, category, curve).predict);
     return {
       label, loo, forward,
       looScore: scorePredictions(actual, loo.map(Math.exp), flatPred),
@@ -586,10 +538,7 @@ function fitRadar(snapshot: Snapshot): Omit<FitSummary, 'ledger'> {
   const evidence = stage.map((s) => ({ label: s.label, loo: s.looScore.miss, forward: s.forwardScore.miss }));
   evidence.push({ label: 'Flat 0.25× TVL', loo: deployed.looScore.flat_miss, forward: deployed.forwardScore.flat_miss });
 
-  const scatter: ScatterPoint[] = rows.map((r) => ({
-    tvl: r.tvl,
-    actual: r.mcap,
-  }));
+  const observations: PricingObservation[] = rows.map((r) => [r.tvl, r.mcap, r.age, r.growth]);
 
   const compSlugs = new Set(rows.map((r) => r.slug));
   // The live-token table: the 24 largest by TVL, in or out of the fit.
@@ -627,14 +576,12 @@ function fitRadar(snapshot: Snapshot): Omit<FitSummary, 'ledger'> {
     loo_rank: deployed.looScore.rank,
     flat_mdape: deployed.looScore.flat_mdape,
     flat_rank: deployed.looScore.flat_rank,
-    age_cap: AGE_CAP,
-    growth_cap: GROWTH_CAP,
     coverage: Math.round(forwardCoverage * 1e3) / 1e3,
-    scatter,
+    observations,
     live,
     odds,
     blinds,
-    valueFit: { beta, xtx, xty, ratios },
+    valueFit: { beta, ratios },
     evidence,
   };
 }
@@ -700,12 +647,7 @@ export interface RadarData {
 function valueRow(p: SnapshotProtocol, snapshot: Snapshot, fit: ValueFit, odds: OddsModel) {
   const { beta, ratios } = fit;
   const age = ageDays(snapshot.as_of, p.listed_at);
-  const years = ageYears(snapshot.as_of, p.listed_at) ?? 1.5;
-  const growth = p.change_7d ?? 0;
-  const sizeBase = Math.exp(beta[0]!) * p.tvl_usd ** beta[1]!;
-  const ageMultiplier = Math.exp(Math.max(-AGE_CAP, Math.min(AGE_CAP, beta[2]! * Math.log(years))));
-  const growthMultiplier = Math.exp(Math.max(-GROWTH_CAP, Math.min(GROWTH_CAP, beta[3]! * growth)));
-  const launch = Math.min(1e11, Math.max(1, Math.round(sizeBase * ageMultiplier * growthMultiplier)));
+  const { base: sizeBase, a: ageMultiplier, g: growthMultiplier, cap: launch } = pricing.factors(beta, p.tvl_usd, age, p.change_7d);
   const launchLow = Math.max(1, Math.round(launch * ratios[0]));
   const launchHigh = Math.min(1e11, Math.round(launch * ratios[1]));
   const chance = Math.round(oddsFor(p, snapshot.as_of, odds) * 1e6) / 1e6;
@@ -728,10 +670,10 @@ function valueRow(p: SnapshotProtocol, snapshot: Snapshot, fit: ValueFit, odds: 
 }
 
 /** A deterministic FNV-1a checksum of the board, shown on the page and recounted there. */
-function boardChecksum(rows: { slug: string; implied_value_usd: number }[]): string {
+function boardChecksum(rows: BoardRow[]): string {
   let hash = 0x811c9dc5;
   for (const r of rows) {
-    const text = `${r.slug}:${r.implied_value_usd}`;
+    const text = `${r.slug}:${r.implied_value_usd}:${r.range.low_usd}:${r.range.high_usd};`;
     for (let i = 0; i < text.length; i++) {
       hash ^= text.charCodeAt(i);
       hash = Math.imul(hash, 0x01000193) >>> 0;
@@ -915,12 +857,10 @@ export function dataScript(radar: RadarData): string {
       return chains.length - 1;
     });
   const fit = radar.meta.fit;
-  const round3 = (v: number): number => Math.round(v * 1e3) / 1e3;
   const live = fit.live.map((l) => [l.name, catId(l.category), l.tvl, l.mcap, l.multiple, l.comp]);
-  const scatter = fit.scatter.map((s) => [round3(Math.log10(s.tvl)), round3(Math.log10(s.actual))]);
   const rows = radar.rows.map((r) => [
     r.slug, r.name, catId(r.category), chainIds(r.chains), r.tvl_usd, r.change_7d,
-    r.age_days, r.watchlist ? 1 : 0, r.implied_value_usd, r.odds, r.range.low_usd, r.range.high_usd,
+    r.age_days, r.watchlist ? 1 : 0, r.implied_value_usd, r.odds,
   ]);
   const meta = {
     as_of: radar.meta.as_of,
@@ -931,13 +871,9 @@ export function dataScript(radar: RadarData): string {
     early: radar.meta.early,
     watchlist_slugs: radar.meta.watchlist_slugs,
     checksum: radar.meta.checksum,
-    beta: fit.valueFit.beta,
-    normal: [fit.valueFit.xtx, fit.valueFit.xty],
     ledger_total: fit.ledger.total,
     fit: {
       outlier_multiple: fit.outlier_multiple,
-      age_cap: fit.age_cap,
-      growth_cap: fit.growth_cap,
       coverage: fit.coverage,
       odds: {
         n: fit.odds.n, cv_brier: fit.odds.cv_brier, cv_auc: fit.odds.cv_auc,
@@ -945,9 +881,8 @@ export function dataScript(radar: RadarData): string {
       },
       blinds: fit.blinds.map((b) => [b.name, b.n, b.mdape, b.flat_mdape, b.rank, b.flat_rank, b.miss, b.flat_miss]),
       evidence: fit.evidence.map((e) => [e.label, e.loo, e.forward]),
-      band: fit.valueFit.ratios,
       ledger: fit.ledger.groups.map((g) => [g.key, g.label, g.n]),
     },
   };
-  return `window.RADAR=${JSON.stringify({ meta, categories, chains, rows, live, scatter })};\n`;
+  return `window.RADAR=${JSON.stringify({ meta, categories, chains, rows, live, observations: fit.observations })};\n`;
 }

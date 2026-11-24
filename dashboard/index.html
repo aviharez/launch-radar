@@ -33,9 +33,10 @@
   <div class="wrap content" id="background">
     <section id="board" aria-label="Ranked protocols">
       <div class="signals" id="signals"></div>
+      <p class="scope" id="scope"></p>
       <div class="section-top">
         <div><p class="eyebrow">01 / PROTOCOL SCREEN</p><h2>Launch candidates</h2></div>
-        <p id="count" aria-live="polite"></p>
+        <div class="board-actions"><p id="count" aria-live="polite"></p><button id="export" class="outline">Export view</button></div>
       </div>
       <div class="filters">
         <label class="search">Search <input id="q" type="search" placeholder="Protocol, category or chain"></label>
@@ -68,6 +69,7 @@
 <footer class="wrap" id="source"></footer>
 <dialog id="detail" aria-labelledby="detail-name"><article id="detail-body"></article></dialog>
 <script src="farm.js"></script>
+<script src="price.js"></script>
 <script src="radar-data.js"></script>
 <script src="app.js"></script>
 </body>
